@@ -1,6 +1,6 @@
 [project]
 name = "iam-policy-lint"
-version = "0.3.1"
+version = "0.3.2"
 description = "A comprehensive tool for linting and validating AWS IAM policies in JSON and YAML formats using Parliament"
 readme = "README.md"
 requires-python = ">=3.9"

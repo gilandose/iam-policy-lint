@@ -352,9 +352,17 @@ class IAMLinter:
                                 "index": i,
                             }
                         )
-                    except json.JSONDecodeError:
-                        # If it's not valid JSON, skip it
-                        continue
+                    except json.JSONDecodeError as e:
+                        # Return an error entry for malformed JSON instead of silently skipping
+                        extracted.append(
+                            {
+                                "policy": None,
+                                "source_file": file_path,
+                                "key_path": key_path,
+                                "index": i,
+                                "json_error": f"Invalid JSON: {str(e)}",
+                            }
+                        )
                 # If it's already a dict, use it directly
                 elif isinstance(policy_data, dict):
                     extracted.append(
@@ -366,9 +374,17 @@ class IAMLinter:
                         }
                     )
 
-        except Exception:
-            # If extraction fails, return empty list
-            pass
+        except Exception as e:
+            # If extraction fails, return an error entry instead of empty list
+            return [
+                {
+                    "policy": None,
+                    "source_file": file_path,
+                    "key_path": key_path,
+                    "index": 0,
+                    "extraction_error": f"Key path extraction failed: {str(e)}",
+                }
+            ]
 
         return extracted
 
@@ -389,6 +405,52 @@ class IAMLinter:
             all_findings = []
 
             for policy_info in extracted_policies:
+                # Check if this is an error entry from extraction/parsing
+                if policy_info["policy"] is None:
+                    # Handle JSON parsing errors
+                    if "json_error" in policy_info:
+                        all_findings.append(
+                            {
+                                "issue": "JSON_PARSE_ERROR",
+                                "title": "Malformed JSON in Embedded Policy",
+                                "description": f"Failed to parse JSON policy: {policy_info['json_error']}",
+                                "severity": "HIGH",
+                                "detail": policy_info["json_error"],
+                                "location": {
+                                    "filepath": policy_info["source_file"],
+                                    "key_path": policy_info["key_path"],
+                                    "index": policy_info["index"],
+                                },
+                                "embedded_source": {
+                                    "file": policy_info["source_file"],
+                                    "key_path": policy_info["key_path"],
+                                    "index": policy_info["index"],
+                                },
+                            }
+                        )
+                    # Handle extraction errors
+                    elif "extraction_error" in policy_info:
+                        all_findings.append(
+                            {
+                                "issue": "EXTRACTION_ERROR",
+                                "title": "Policy Extraction Error",
+                                "description": f"Failed to extract policy: {policy_info['extraction_error']}",
+                                "severity": "HIGH",
+                                "detail": policy_info["extraction_error"],
+                                "location": {
+                                    "filepath": policy_info["source_file"],
+                                    "key_path": policy_info["key_path"],
+                                },
+                                "embedded_source": {
+                                    "file": policy_info["source_file"],
+                                    "key_path": policy_info["key_path"],
+                                    "index": policy_info.get("index", 0),
+                                },
+                            }
+                        )
+                    continue
+
+                # Normal policy processing
                 policy = policy_info["policy"]
                 source_info = f"{policy_info['source_file']}:{policy_info['key_path']}[{policy_info['index']}]"
 
