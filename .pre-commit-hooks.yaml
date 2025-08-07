@@ -1,0 +1,9 @@
+- id: iam-embedded
+  name: IAM Embedded Issues Check
+  entry: iam-policy-lint lint-embedded
+  args: []
+  language: python
+  pass_filenames: true
+  description: "Block commits if IAM security/formatting issues are found in embedded policies"
+  additional_dependencies: []
+  minimum_pre_commit_version: "2.9.2"
