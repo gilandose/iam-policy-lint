@@ -1,0 +1,120 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  # Standard Python hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+        files: ^examples/.*\.json$
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  # Python code formatting and linting
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.8.0
+    hooks:
+      # Run the linter.
+      - id: ruff
+        args: [--fix]
+      # Run the formatter.
+      - id: ruff-format
+
+    # IAM JSON Lint - Using published PyPI package
+  - repo: local
+    hooks:
+      - id: iam-json-lint
+        name: IAM Policy Linter
+        entry: iam-policy-lint lint
+        language: python
+        files: ^examples/.*\.(json|yaml|yml)$
+        pass_filenames: true
+        description: "Lint IAM policies in examples/ directory for security issues"
+        stages: [manual]
+        additional_dependencies: [iam-policy-lint]
+
+      - id: iam-json-validate
+        name: IAM Policy Validator
+        entry: iam-policy-lint validate
+        language: python
+        files: ^examples/.*\.(json|yaml|yml)$
+        pass_filenames: true
+        description: "Validate IAM policy structure in examples/ directory"
+        stages: [manual]
+        additional_dependencies: [iam-policy-lint]
+
+      - id: iam-embedded-lint
+        name: IAM Embedded Policy Linter (YAML)
+        entry: iam-policy-lint lint-embedded
+        args: [
+          "--key-path", "spec.resourceConfig.inlinePolicy[].policy",
+          "--key-path", "metadata.annotations.\"iam.policy\"",
+          "--key-path", "spec.template.spec.containers[].env[].value",
+          "--key-path", "data.policy",
+          "--key-path", "spec.policies[].document",
+          "--key-path", "config.iamPolicy",
+          "--key-path", "parameters.PolicyDocument"
+        ]
+        language: python
+        files: ^examples/.*\.yaml$
+        pass_filenames: true
+        description: "Lint embedded IAM policies in YAML files (Kubernetes, Terraform, CloudFormation, etc.)"
+        stages: [manual]
+        additional_dependencies: [iam-policy-lint>=0.3.1]
+
+  # Additional security checks using the PyPI package
+  - repo: local
+    hooks:
+      - id: iam-critical-check
+        name: IAM Critical Issues Check (Block Commit)
+        entry: iam-policy-lint lint --severity CRITICAL --format json
+        language: python
+        files: ^examples/.*\.(json|yaml|yml)$
+        pass_filenames: true
+        description: "Block commits if CRITICAL IAM security issues are found"
+        stages: [manual]
+        additional_dependencies: [iam-policy-lint]
+
+      - id: iam-embedded-critical-check
+        name: IAM Embedded Critical Issues Check (Block Commit)
+        entry: iam-policy-lint lint-embedded --severity CRITICAL --format json
+        args: [
+          "--key-path", "spec.resourceConfig.inlinePolicy[].policy",
+          "--key-path", "metadata.annotations.\"iam.policy\"",
+          "--key-path", "spec.template.spec.containers[].env[].value",
+          "--key-path", "data.policy",
+          "--key-path", "spec.policies[].document",
+          "--key-path", "config.iamPolicy",
+          "--key-path", "parameters.PolicyDocument"
+        ]
+        language: python
+        files: ^examples/.*\.yaml$
+        pass_filenames: true
+        description: "Block commits if CRITICAL IAM security issues are found in embedded policies"
+        stages: [manual]
+        additional_dependencies: [iam-policy-lint>=0.3.1]
+
+  # Optional: Simple wildcard check (no external dependencies needed)
+  - repo: local
+    hooks:
+      - id: iam-wildcard-check
+        name: IAM Wildcard Check
+        entry: bash -c 'for file in "$@"; do if grep -q "\*" "$file"; then echo "⚠️  Wildcard (*) found in $file - review for overly broad permissions"; fi; done' --
+        language: system
+        files: ^examples/.*\.(json|yaml|yml)$
+        pass_filenames: true
+        description: "Warn about wildcard usage in IAM policies"
+        stages: [manual]
+        verbose: true
+        # This hook doesn't fail the commit, just warns
