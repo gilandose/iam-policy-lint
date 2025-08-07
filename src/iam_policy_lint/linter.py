@@ -2,11 +2,20 @@
 
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Optional, Union
 
-import parliament
-import yaml
+# Suppress Parliament pkg_resources deprecation warning
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    module="parliament",
+    message=".*pkg_resources is deprecated.*",
+)
+
+import parliament  # noqa: E402
+import yaml  # noqa: E402
 
 
 class IAMLinter:
